@@ -1,3 +1,4 @@
+/// <reference path="../../types.d.ts" />
 import { useEffect, useState } from 'react';
 
 export function useStatistics(dataPointCount: number): Statistics[] {
