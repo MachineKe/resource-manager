@@ -11,7 +11,6 @@
     // ignore errors from dependencies
     "skipLibCheck": true,
     // add global types
-    "types": ["node"],
-    "typeRoots": ["../../node_modules/@types", "../../types"]
+    "types": ["../../types"]
   }
 }

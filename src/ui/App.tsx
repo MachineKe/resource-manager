@@ -1,108 +1,128 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "./assets/vite.svg";
-import heroImg from "./assets/hero.png";
-import "./App.css";
+import { useEffect, useMemo, useState } from 'react';
+import reactLogo from './assets/react.svg';
+import './App.css';
+import { useStatistics } from './useStatistics';
+import { Chart } from './Chart';
 
 function App() {
-  const [count, setCount] = useState(0);
+  const staticData = useStaticData();
+  const statistics = useStatistics(10);
+  const [activeView, setActiveView] = useState<View>('CPU');
+  const cpuUsages = useMemo(
+    () => statistics.map((stat) => stat.cpuUsage),
+    [statistics]
+  );
+  const ramUsages = useMemo(
+    () => statistics.map((stat) => stat.ramUsage),
+    [statistics]
+  );
+  const storageUsages = useMemo(
+    () => statistics.map((stat) => stat.storageUsage),
+    [statistics]
+  );
+  const activeUsages = useMemo(() => {
+    switch (activeView) {
+      case 'CPU':
+        return cpuUsages;
+      case 'RAM':
+        return ramUsages;
+      case 'STORAGE':
+        return storageUsages;
+    }
+  }, [activeView, cpuUsages, ramUsages, storageUsages]);
+
+  useEffect(() => {
+    return window.electron.subscribeChangeView((view) => setActiveView(view));
+  }, []);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <div className="App">
+      <Header />
+      <div className="main">
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
+          <SelectOption
+            onClick={() => setActiveView('CPU')}
+            title="CPU"
+            view="CPU"
+            subTitle={staticData?.cpuModel ?? ''}
+            data={cpuUsages}
+          />
+          <SelectOption
+            onClick={() => setActiveView('RAM')}
+            title="RAM"
+            view="RAM"
+            subTitle={(staticData?.totalMemoryGB.toString() ?? '') + ' GB'}
+            data={ramUsages}
+          />
+          <SelectOption
+            onClick={() => setActiveView('STORAGE')}
+            title="STORAGE"
+            view="STORAGE"
+            subTitle={(staticData?.totalStorage.toString() ?? '') + ' GB'}
+            data={storageUsages}
+          />
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
+        <div className="mainGrid">
+          <Chart
+            selectedView={activeView}
+            data={activeUsages}
+            maxDataPoints={10}
+          />
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      </div>
+    </div>
   );
+}
+
+function SelectOption(props: {
+  title: string;
+  view: View;
+  subTitle: string;
+  data: number[];
+  onClick: () => void;
+}) {
+  return (
+    <button className="selectOption" onClick={props.onClick}>
+      <div className="selectOptionTitle">
+        <div>{props.title}</div>
+        <div>{props.subTitle}</div>
+      </div>
+      <div className="selectOptionChart">
+        <Chart selectedView={props.view} data={props.data} maxDataPoints={10} />
+      </div>
+    </button>
+  );
+}
+
+function Header() {
+  return (
+    <header>
+      <button
+        id="close"
+        onClick={() => window.electron.sendFrameAction('CLOSE')}
+      />
+      <button
+        id="minimize"
+        onClick={() => window.electron.sendFrameAction('MINIMIZE')}
+      />
+      <button
+        id="maximize"
+        onClick={() => window.electron.sendFrameAction('MAXIMIZE')}
+      />
+    </header>
+  );
+}
+
+function useStaticData() {
+  const [staticData, setStaticData] = useState<StaticData | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      setStaticData(await window.electron.getStaticData());
+    })();
+  }, []);
+
+  return staticData;
 }
 
 export default App;
